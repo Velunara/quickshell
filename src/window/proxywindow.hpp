@@ -4,6 +4,7 @@
 
 #include <qcolor.h>
 #include <qcontainerfwd.h>
+#include <qelapsedtimer.h>
 #include <qevent.h>
 #include <qnamespace.h>
 #include <qobject.h>
@@ -275,7 +276,11 @@ protected:
 	void exposeEvent(QExposeEvent* event) override;
 
 private:
+	bool throttleUpdateRequest();
+
 	ProxyWindowBase* mProxy;
+	QElapsedTimer updateThrottleTimer;
+	bool delayedUpdatePending = false;
 };
 
 class ProxyWindowContentItem: public QQuickItem {
