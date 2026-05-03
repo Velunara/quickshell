@@ -20,6 +20,7 @@
 #include <qregion.h>
 #include <qsurfaceformat.h>
 #include <qtenvironmentvariables.h>
+#include <qtimer.h>
 #include <qtmetamacros.h>
 #include <qtypes.h>
 #include <qvariant.h>
@@ -115,7 +116,7 @@ void ProxyWindowBase::ensureQWindow() {
 		static const auto useDepth = qEnvironmentVariableIsEmpty("QSG_NO_DEPTH_BUFFER");
 		static const auto useStencil = qEnvironmentVariableIsEmpty("QSG_NO_STENCIL_BUFFER");
 		static const auto enableDebug = qEnvironmentVariableIsSet("QSG_OPENGL_DEBUG");
-		static const auto disableVSync = qEnvironmentVariableIsSet("QSG_NO_VSYNC");
+		static const auto disableVSync = qEnvironmentVariableIntValue("QSG_NO_VSYNC") != 0;
 
 		if (useDepth && format.depthBufferSize() == -1) format.setDepthBufferSize(24);
 		else if (!useDepth) format.setDepthBufferSize(0);
@@ -625,6 +626,18 @@ ProxiedWindow::ProxiedWindow(ProxyWindowBase* proxy, QWindow* parent)
 
 namespace {
 QList<std::function<void(QQuickWindow*)>> SCENEGRAPH_INIT_CALLBACKS; // NOLINT
+
+qint64 minUpdateIntervalNs() {
+	static const auto interval = []() -> qint64 {
+		auto maxFps = qEnvironmentVariableIntValue("QS_MAX_RENDER_FPS");
+		if (!qEnvironmentVariableIsSet("QS_MAX_RENDER_FPS")) maxFps = 60;
+		if (maxFps <= 0) return 0;
+
+		return 1000000000ll / maxFps;
+	}();
+
+	return interval;
+}
 }
 
 void ProxiedWindow::callOnScenegraphInit(std::function<void(QQuickWindow*)> cb) { // NOLINT
@@ -640,11 +653,44 @@ void ProxiedWindow::onSceneGraphInitialized() {
 }
 
 bool ProxiedWindow::event(QEvent* event) {
+	if (event->type() == QEvent::UpdateRequest && this->throttleUpdateRequest()) {
+		return true;
+	}
+
 	if (event->type() == QEvent::DevicePixelRatioChange) {
 		emit this->devicePixelRatioChanged();
 	}
 
 	return this->QQuickWindow::event(event);
+}
+
+bool ProxiedWindow::throttleUpdateRequest() {
+	auto minInterval = minUpdateIntervalNs();
+	if (minInterval == 0) return false;
+
+	if (!this->updateThrottleTimer.isValid()) {
+		this->updateThrottleTimer.start();
+		return false;
+	}
+
+	auto elapsed = this->updateThrottleTimer.nsecsElapsed();
+	if (elapsed >= minInterval) {
+		this->updateThrottleTimer.restart();
+		return false;
+	}
+
+	if (!this->delayedUpdatePending) {
+		this->delayedUpdatePending = true;
+
+		auto remaining = minInterval - elapsed;
+		auto delayMs = static_cast<int>((remaining + 999999) / 1000000);
+		QTimer::singleShot(delayMs, this, [this]() {
+			this->delayedUpdatePending = false;
+			if (this->isExposed()) this->requestUpdate();
+		});
+	}
+
+	return true;
 }
 
 void ProxiedWindow::exposeEvent(QExposeEvent* event) {

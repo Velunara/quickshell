@@ -241,15 +241,22 @@ int launch(const LaunchArgs& args, char** argv, QCoreApplication* coreApplicatio
 	// 	}
 	// }
 
-	// While the simple animation driver can lead to better animations in some cases,
-	// it also can cause excessive repainting at excessively high framerates which can
-	// lead to noticeable amounts of gpu usage, including overheating on some systems.
-	// This gets worse the more windows are open, as repaints trigger on all of them for
-	// some reason. See QTBUG-126099 for details.
+	// Qt keeps the simple animation driver opt-in for compatibility. For shells this is the
+	// safer default: when vsync is unavailable or unreliable, the threaded render loop can
+	// otherwise advance animations as fast as frames can be produced.
+	if (!qEnvironmentVariableIsSet("QSG_USE_SIMPLE_ANIMATION_DRIVER")) {
+		qputenv("QSG_USE_SIMPLE_ANIMATION_DRIVER", "1");
+	}
 
-	// if (!qEnvironmentVariableIsSet("QSG_USE_SIMPLE_ANIMATION_DRIVER")) {
-	// 	qputenv("QSG_USE_SIMPLE_ANIMATION_DRIVER", "1");
-	// }
+	if (qEnvironmentVariable("QSG_RENDER_LOOP") == QStringLiteral("threaded")
+	    && qEnvironmentVariableIntValue("QSG_NO_VSYNC") != 0
+	    && qEnvironmentVariableIntValue("QS_ALLOW_THREADED_NO_VSYNC") != 1)
+	{
+		qWarning() << "QSG_RENDER_LOOP=threaded with QSG_NO_VSYNC is prone to unthrottled "
+		              "rendering; using QSG_RENDER_LOOP=basic. Set QS_ALLOW_THREADED_NO_VSYNC=1 "
+		              "to keep the threaded render loop.";
+		qputenv("QSG_RENDER_LOOP", "basic");
+	}
 
 	// Some programs place icons in the pixmaps folder instead of the icons folder.
 	// This seems to be controlled by the QPA and qt6ct does not provide it.
