@@ -130,6 +130,9 @@ void WindowInterface::setSurfaceFormat(QsSurfaceFormat format) const { this->pro
 bool WindowInterface::updatesEnabled() const { return this->proxyWindow()->updatesEnabled(); };
 void WindowInterface::setUpdatesEnabled(bool updatesEnabled) const { this->proxyWindow()->setUpdatesEnabled(updatesEnabled); };
 
+qint32 WindowInterface::renderFps() const { return this->proxyWindow()->renderFps(); };
+void WindowInterface::setRenderFps(qint32 renderFps) const { this->proxyWindow()->setRenderFps(renderFps); };
+
 QQmlListProperty<QObject> WindowInterface::data() const { return this->proxyWindow()->data(); };
 // clang-format on
 
@@ -152,6 +155,7 @@ void WindowInterface::connectSignals() const {
 	QObject::connect(window, &ProxyWindowBase::maskChanged, this, &WindowInterface::maskChanged);
 	QObject::connect(window, &ProxyWindowBase::surfaceFormatChanged, this, &WindowInterface::surfaceFormatChanged);
 	QObject::connect(window, &ProxyWindowBase::updatesEnabledChanged, this, &WindowInterface::updatesEnabledChanged);
+	QObject::connect(window, &ProxyWindowBase::renderFpsChanged, this, &WindowInterface::renderFpsChanged);
 	// clang-format on
 }
 

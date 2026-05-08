@@ -501,6 +501,14 @@ void ProxyWindowBase::setUpdatesEnabled(bool updatesEnabled) {
 	emit this->updatesEnabledChanged();
 }
 
+qint32 ProxyWindowBase::renderFps() const { return this->mRenderFps; }
+
+void ProxyWindowBase::setRenderFps(qint32 renderFps) {
+	if (renderFps == this->mRenderFps) return;
+	this->mRenderFps = renderFps;
+	emit this->renderFpsChanged();
+}
+
 qreal ProxyWindowBase::devicePixelRatio() const {
 	if (this->window != nullptr) return this->window->devicePixelRatio();
 	if (this->mScreen != nullptr) return this->mScreen->devicePixelRatio();
@@ -627,16 +635,21 @@ ProxiedWindow::ProxiedWindow(ProxyWindowBase* proxy, QWindow* parent)
 namespace {
 QList<std::function<void(QQuickWindow*)>> SCENEGRAPH_INIT_CALLBACKS; // NOLINT
 
-qint64 minUpdateIntervalNs() {
-	static const auto interval = []() -> qint64 {
+qint32 defaultRenderFps() {
+	static const auto defaultFps = []() -> qint32 {
 		auto maxFps = qEnvironmentVariableIntValue("QS_MAX_RENDER_FPS");
 		if (!qEnvironmentVariableIsSet("QS_MAX_RENDER_FPS")) maxFps = 60;
-		if (maxFps <= 0) return 0;
-
-		return 1000000000ll / maxFps;
+		return maxFps;
 	}();
 
-	return interval;
+	return defaultFps;
+}
+
+qint64 minUpdateIntervalNs(qint32 renderFps) {
+	if (renderFps < 0) renderFps = defaultRenderFps();
+	if (renderFps <= 0) return 0;
+
+	return 1000000000ll / renderFps;
 }
 }
 
@@ -665,7 +678,7 @@ bool ProxiedWindow::event(QEvent* event) {
 }
 
 bool ProxiedWindow::throttleUpdateRequest() {
-	auto minInterval = minUpdateIntervalNs();
+	auto minInterval = minUpdateIntervalNs(this->mProxy ? this->mProxy->renderFps() : -1);
 	if (minInterval == 0) return false;
 
 	if (!this->updateThrottleTimer.isValid()) {
