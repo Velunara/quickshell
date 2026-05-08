@@ -149,6 +149,11 @@ class WindowInterface: public Reloadable {
 	/// or other visual updates from other windows. This is useful for static windows
 	/// such as wallpapers that do not need to update frequently, saving GPU cycles.
 	Q_PROPERTY(bool updatesEnabled READ updatesEnabled WRITE setUpdatesEnabled NOTIFY updatesEnabledChanged);
+	/// The maximum render updates per second for this window.
+	///
+	/// Defaults to -1, which follows `QS_MAX_RENDER_FPS` or 60 if unset.
+	/// Set to 0 to disable throttling for this window.
+	Q_PROPERTY(qint32 renderFps READ renderFps WRITE setRenderFps NOTIFY renderFpsChanged);
 	Q_PROPERTY(QQmlListProperty<QObject> data READ data);
 	// clang-format on
 	Q_CLASSINFO("DefaultProperty", "data");
@@ -240,6 +245,9 @@ public:
 	[[nodiscard]] bool updatesEnabled() const;
 	void setUpdatesEnabled(bool updatesEnabled) const;
 
+	[[nodiscard]] qint32 renderFps() const;
+	void setRenderFps(qint32 renderFps) const;
+
 	[[nodiscard]] QQmlListProperty<QObject> data() const;
 
 	static QsWindowAttached* qmlAttachedProperties(QObject* object);
@@ -268,6 +276,7 @@ signals:
 	void maskChanged();
 	void surfaceFormatChanged();
 	void updatesEnabledChanged();
+	void renderFpsChanged();
 
 protected:
 	void connectSignals() const;
