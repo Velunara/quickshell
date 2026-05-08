@@ -83,12 +83,18 @@ QString QmlToolingSupport::getQmllsConfig() {
 		auto importPaths = QQmlEngine().importPathList();
 		importPaths.removeIf([](const QString& path) { return path.startsWith("qrc:"); });
 
+
 		auto vfsPath = QsPaths::instance()->shellVfsDir()->path();
+
+		// Inject the build directory into the import path list
+		auto buildDir = "build:" + vfsPath;
+		importPaths.prepend("build/qml");
+
 		auto importPathsStr = importPaths.join(u':');
 
 		QString qmllsConfig;
 		auto print = QDebug(&qmllsConfig).nospace();
-		print << "[General]\nno-cmake-calls=true\nbuildDir=" << vfsPath
+		print << "[General]\nno-cmake-calls=true\nbuildDir=" << buildDir
 		      << "\nimportPaths=" << importPathsStr << '\n';
 
 		return qmllsConfig;
