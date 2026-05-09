@@ -14,7 +14,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(QS_BUILD_OPTIONS "")
 
 # should be changed for forks
-set(CRASHREPORT_URL "https://github.com/outfoxxed/quickshell/issues/new?template=crash2.yml" CACHE STRING "Bugreport URL")
+set(CRASHREPORT_URL "https://github.com/Velunara/quickshell/issues/new?template=crash2.yml" CACHE STRING "Bugreport URL")
 
 function(boption VAR NAME DEFAULT)
 	cmake_parse_arguments(PARSE_ARGV 3 arg "" "REQUIRES" "")
@@ -42,7 +42,7 @@ function(boption VAR NAME DEFAULT)
 	set(QS_BUILD_OPTIONS "${QS_BUILD_OPTIONS}" PARENT_SCOPE)
 endfunction()
 
-set(DISTRIBUTOR "Unset" CACHE STRING "Distributor")
+set(DISTRIBUTOR "Velunara" CACHE STRING "Distributor")
 string(APPEND QS_BUILD_OPTIONS "  Distributor: ${DISTRIBUTOR}")
 
 message(STATUS "Quickshell configuration")

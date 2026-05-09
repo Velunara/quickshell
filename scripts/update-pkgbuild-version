@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+	cat <<'EOF'
+Usage: scripts/update-pkgbuild-version [--pkgrel N] [PKGBUILD]
+
+Updates the literal pkgver= field in PKGBUILD from:
+  - project(... VERSION "...") in CMakeLists.txt
+  - git commit count
+  - git short commit hash
+
+If --pkgrel is provided, pkgrel= is updated too.
+EOF
+}
+
+pkgrel=
+pkgbuild=
+
+while (($#)); do
+	case "$1" in
+		--pkgrel)
+			shift
+			if (($# == 0)); then
+				echo 'error: --pkgrel needs a value' >&2
+				exit 2
+			fi
+			pkgrel="$1"
+			;;
+		-h|--help)
+			usage
+			exit 0
+			;;
+		-*)
+			echo "error: unknown option: $1" >&2
+			exit 2
+			;;
+		*)
+			if [[ -n "$pkgbuild" ]]; then
+				echo 'error: only one PKGBUILD path may be provided' >&2
+				exit 2
+			fi
+			pkgbuild="$1"
+			;;
+	esac
+	shift
+done
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if repo_root="$(git -C "$script_dir/.." rev-parse --show-toplevel 2>/dev/null)"; then
+	:
+else
+	repo_root="$(cd "$script_dir/.." && pwd)"
+fi
+pkgbuild="${pkgbuild:-$repo_root/PKGBUILD}"
+cmakelists="$repo_root/CMakeLists.txt"
+
+if [[ ! -f "$pkgbuild" ]]; then
+	echo "error: PKGBUILD not found: $pkgbuild" >&2
+	exit 1
+fi
+
+base="$(
+	awk -F'"' '/project\(quickshell VERSION/ { print $2; found=1; exit } END { exit found ? 0 : 1 }' "$cmakelists"
+)"
+
+if git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+	version="$base.r$(git -C "$repo_root" rev-list --count HEAD).g$(git -C "$repo_root" rev-parse --short HEAD)"
+else
+	version="$base"
+fi
+
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+
+awk -v version="$version" -v pkgrel="$pkgrel" '
+	BEGIN {
+		updated_pkgver = 0
+		updated_pkgrel = 0
+	}
+	/^pkgver=/ {
+		print "pkgver=" version
+		updated_pkgver = 1
+		next
+	}
+	pkgrel != "" && /^pkgrel=/ {
+		print "pkgrel=" pkgrel
+		updated_pkgrel = 1
+		next
+	}
+	{ print }
+	END {
+		if (!updated_pkgver) {
+			print "error: pkgver= was not found" > "/dev/stderr"
+			exit 1
+		}
+		if (pkgrel != "" && !updated_pkgrel) {
+			print "error: pkgrel= was not found" > "/dev/stderr"
+			exit 1
+		}
+	}
+' "$pkgbuild" > "$tmp"
+
+mv "$tmp" "$pkgbuild"
+trap - EXIT
+
+if [[ -n "$pkgrel" ]]; then
+	echo "Updated $(realpath --relative-to="$repo_root" "$pkgbuild"): pkgver=$version pkgrel=$pkgrel"
+else
+	echo "Updated $(realpath --relative-to="$repo_root" "$pkgbuild"): pkgver=$version"
+fi
